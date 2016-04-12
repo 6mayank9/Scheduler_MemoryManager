@@ -139,6 +139,7 @@ void *myallocate_thread(int size)
 	index = threadList[currentThread].current_index;
 	threadList[currentThread].current_index = threadList[currentThread].current_index + size;
 	base = (void*)(threadList[currentThread].end_address + index - 4095);
+	//base = (void *)(threadList[currentThread].start_address);
 	return base;
 
 }
@@ -361,6 +362,7 @@ int my_pthread_create( void (*func)(void) )
 	threadList[numThreads].context.uc_stack.ss_size = FIBER_STACK;
 	threadList[numThreads].context.uc_stack.ss_flags = 0;
 	threadList[numThreads].start_address = (void*)myallocate(4095,0);
+	threadList[numThreads].end_address = threadList[numThreads].start_address + 4095;
 	threadList[numThreads].current_index = 0;
 	
 	if ( threadList[numThreads].stack == 0 )
