@@ -18,6 +18,8 @@ http://lists.apple.com/archives/darwin-dev/2008/Jan/msg00229.html */
 #include <unistd.h>
 char c[1024*1024*8];
 char *memory = c;
+char c2[1024*1024*16];
+char *memory2 = c2;
 int start_index = 0;
 int current_index = 0;
 
@@ -63,8 +65,9 @@ struct block_meta {
 };
 
 void *global_base = NULL;
-
+struct block_meta *temp;
 #define META_SIZE sizeof(struct block_meta)
+
 void *sbrk1(int nbytes)
 {	
 	void *base;
@@ -204,7 +207,7 @@ void mydeallocate(void *ptr, int type) {
 }
 
 
-/* Sets all the threads to be initially inactive */
+
 void alarmhandler(int signum)
 {
 	
@@ -326,6 +329,17 @@ void my_pthread_yield(int priority_thread)
 			/* Free the "current" thread's stack */
 			free( threadList[currentThread].stack );
 			
+
+            temp = global_base;
+            while(temp != NULL) 
+            {
+    
+                if(temp->owner_thread == currentThread)
+    	              temp->free = 1;
+                temp = temp->next;
+            }
+ 			printf("Freed\n");
+
 			/* Swap the last thread with the current, now empty, entry */
 			-- numThreads;
 			if(threadList[currentThread].priority ==0)
