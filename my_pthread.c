@@ -18,10 +18,14 @@ http://lists.apple.com/archives/darwin-dev/2008/Jan/msg00229.html */
 #include <unistd.h>
 char c[1024*1024*8];
 char *memory = c;
-char c2[1024*1024*16];
-char *memory2 = c2;
 int start_index = 0;
 int current_index = 0;
+
+char d[1024*1024*16];
+char *swap_memory = d;
+int start_index_swap = 0;
+int current_index_swap = 0;
+int i =0;
 
 
 /* The Thread Structure
@@ -37,6 +41,10 @@ typedef struct
 	void *start_address;
 	void *end_address;
 	int current_index;
+	int swapped;
+	int page_count;
+	void *start_address_swap;
+	void *end_address_swap;
 } myThread;
 /* The thread "queue" */
 static myThread threadList[ MAX_THREADS ];
@@ -66,7 +74,93 @@ struct block_meta {
 
 void *global_base = NULL;
 struct block_meta *temp;
+
 #define META_SIZE sizeof(struct block_meta)
+
+void *getswapmemory(int size)
+{void *getswapmemory(int size)
+{
+	int i,j,position,m=0;
+	long int startadd[numThreads],endadd[numThreads],c=0;
+	long int temp;
+	//printf("%p %lu\n",swap_memory, (long int)swap_memory );
+	for(i=0;i<numThreads;i++)
+	{ 
+		if(threadList[i].swapped == 1)
+		{ m=1;
+          startadd[c] = (long int)threadList[i].start_address_swap;
+          endadd[c] = (long int)threadList[i].end_address_swap;
+          c++;
+		}
+	}
+	temp= startadd[0];
+    for(i=0;i<c;i++)
+   	{ 
+   		position = i;
+       for(j=i+1;j<c;j++)
+       {
+       	if(startadd[j]<startadd[position])
+       	{
+       		position = j;
+       	}
+       }
+       if(position!=i)
+       {
+       	temp = startadd[i];
+       	startadd[i] = startadd[position];
+       	startadd[position] = temp;
+       }
+   }
+  
+   if(startadd[0] - (long int)swap_memory >= (long int)size || m==0 )
+   	return (void *)swap_memory;
+   startadd[c] = swap_memory +(1024*1024*16);
+   c++;
+  for(i=0;i<c;i++)
+  {
+    if(startadd[i+1] - endadd[i]>(long int)size)
+    	return ((void *)endadd[i]+1);
+  }
+return NULL;
+}
+
+
+int swapout()
+{
+	void *dest;
+	struct block_meta *temp;
+	int size;
+	int thread;
+	thread = threadToBeSwapped();
+	if(thread == -1)
+		return 0;
+	size = threadList[thread].end_address - threadList[thread].start_address;
+	dest = getswapmemory(size);
+	if(dest == NULL)
+		return 0;
+	memcpy(dest, threadList[thread].start_address, size);
+	threadList[thread].swapped = 1;
+	current_index_swap = current_index_swap + size;
+	temp = global_base;
+    while(temp != NULL) 
+    {
+    
+       	if(temp->owner_thread == thread)
+    	temp->free = 1;
+       	temp = temp->next;
+    }
+	printf("\nThread %d swapped out\n", thread);
+
+}
+int threadToBeSwapped()
+{
+	struct block_meta *block = global_base;
+	while(block!=NULL && block->owner_thread == currentThread && block->free == 0)
+		block = block->next;
+	if(block == NULL)return -1;
+	return block->owner_thread;
+
+}
 
 void *sbrk1(int nbytes)
 {	
@@ -125,7 +219,7 @@ void *myallocate_thread(int size)
   		block->size = 4095;
 		block->next = NULL;
 		block->free = 0;
-		block->owner_thread = numThreads;
+		block->owner_thread = currentThread;
 		while(current->owner_thread != currentThread)
 			current = current->next;
 		temp = current->next;
@@ -147,16 +241,23 @@ void *myallocate_thread(int size)
 
 }
 void *myallocate_self(int size)
-{
+{	
 	struct block_meta *block;
 	struct block_meta *last = global_base;
-	if (!global_base) { // First call.
-    block = request_space(NULL, size);
-    if (!block) 
-    {
-      return NULL;
-    }
-    global_base = block;
+	//For test Purpose
+	
+	if((i++)==2)
+		return NULL;
+	
+	if (!global_base) 
+	{ // First call.
+	   
+	   	block = request_space(NULL, size);
+	    if (!block) 
+	    {
+	      return NULL;
+	    }
+	    global_base = block;
     } 
   else {
     block = find_free_block(&last, size);
@@ -179,6 +280,7 @@ void *myallocate_self(int size)
 void *myallocate(int size, int type) {
   
   struct block_meta *block;
+  int i;
   if (size <= 0 || size >= 4096) {
     return NULL;
   }
@@ -190,6 +292,22 @@ void *myallocate(int size, int type) {
   else
   {
   	block = myallocate_self(size);
+  	if(block==NULL)
+  	{	
+  		if(current_index_swap + size > 16777216)
+  			return NULL;
+  		else
+  		{
+	  		if(swapout())
+	  		{
+	  			block = myallocate(size, type);
+	  			block->owner_thread = numThreads;
+	  			return block;
+	  		}
+	  		else
+	  			return NULL;
+  		}
+  	}
   }
   block->owner_thread = numThreads;
   return(block + 1);
@@ -207,7 +325,7 @@ void mydeallocate(void *ptr, int type) {
 }
 
 
-
+/* Sets all the threads to be initially inactive */
 void alarmhandler(int signum)
 {
 	
@@ -236,6 +354,8 @@ void initThreads()
 	{
 		threadList[i].active = 0;
 		threadList[i].priority = 0;
+		threadList[i].swapped = 0;
+		threadList[i].page_count = 0;
 	}
 		
 	return;
@@ -379,9 +499,9 @@ int my_pthread_create( void (*func)(void) )
 	threadList[numThreads].end_address = threadList[numThreads].start_address + 4095;
 	threadList[numThreads].current_index = 0;
 	
-	if ( threadList[numThreads].stack == 0 )
+	if ( threadList[numThreads].stack == 0 || threadList[numThreads].start_address == NULL)
 	{
-		LF_DEBUG_OUT( "Error: Could not allocate stack." );
+		LF_DEBUG_OUT( "Error: Could not allocate stack. or heapspace" );
 		return LF_MALLOCERROR;
 	}
 	
