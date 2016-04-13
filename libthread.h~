@@ -27,7 +27,7 @@ typedef int THREADREQ;
 #endif
 
 /* The maximum number of threads that can be active at once. */
-#define MAX_THREADS 10000
+#define MAX_THREADS 10
 /* The size of the stack for each thread. */
 #define FIBER_STACK (1024*1024)
 

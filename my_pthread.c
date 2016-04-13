@@ -74,11 +74,11 @@ struct block_meta {
 
 void *global_base = NULL;
 struct block_meta *temp;
+struct block_meta *tempSwap;
 
 #define META_SIZE sizeof(struct block_meta)
 
 void *getswapmemory(int size)
-{void *getswapmemory(int size)
 {
 	int i,j,position,m=0;
 	long int startadd[numThreads],endadd[numThreads],c=0;
@@ -89,7 +89,9 @@ void *getswapmemory(int size)
 		if(threadList[i].swapped == 1)
 		{ m=1;
           startadd[c] = (long int)threadList[i].start_address_swap;
+          //printf("startadd: %lu\n",startadd[c]);
           endadd[c] = (long int)threadList[i].end_address_swap;
+          //printf("endadd: %lu\n",endadd[c] );
           c++;
 		}
 	}
@@ -114,7 +116,7 @@ void *getswapmemory(int size)
   
    if(startadd[0] - (long int)swap_memory >= (long int)size || m==0 )
    	return (void *)swap_memory;
-   startadd[c] = swap_memory +(1024*1024*16);
+   startadd[c] = (long int)swap_memory +(1024*1024*16);
    c++;
   for(i=0;i<c;i++)
   {
@@ -136,10 +138,15 @@ int swapout()
 		return 0;
 	size = threadList[thread].end_address - threadList[thread].start_address;
 	dest = getswapmemory(size);
+	//printf("getswapmemory: %p\n",dest);
 	if(dest == NULL)
 		return 0;
 	memcpy(dest, threadList[thread].start_address, size);
 	threadList[thread].swapped = 1;
+	threadList[thread].start_address_swap = dest;
+	//printf("start_address_swap: %lu \n",(long int)threadList[thread].start_address_swap );
+	threadList[thread].end_address_swap = dest + size;
+    //printf("end_address_swap: %lu \n",(long int)threadList[thread].end_address_swap );
 	current_index_swap = current_index_swap + size;
 	temp = global_base;
     while(temp != NULL) 
@@ -150,7 +157,7 @@ int swapout()
        	temp = temp->next;
     }
 	printf("\nThread %d swapped out\n", thread);
-
+   return 1;
 }
 int threadToBeSwapped()
 {
@@ -160,6 +167,24 @@ int threadToBeSwapped()
 	if(block == NULL)return -1;
 	return block->owner_thread;
 
+}
+
+int swapin()
+{
+	printf("Swap In called\n");
+	int size;
+	int thread;
+	void *tempSwapaddress=tempSwap;
+
+	size = threadList[currentThread].end_address - threadList[currentThread].start_address;
+	memcpy (tempSwapaddress,threadList[currentThread].start_address,size); // block at C copied to tempSwap memory
+	thread = (*tempSwap).owner_thread; // get owner here
+	threadList[thread].swapped = 1;
+	memcpy (threadList[thread].start_address,threadList[currentThread].start_address_swap,size); // swapping back in
+	threadList[currentThread].swapped = 0;
+	memcpy (threadList[currentThread].start_address_swap,tempSwapaddress,size); //copying tempSwap to swap memory
+
+	printf("\nThread %d swapped back in\n",currentThread);
 }
 
 void *sbrk1(int nbytes)
@@ -244,10 +269,8 @@ void *myallocate_self(int size)
 {	
 	struct block_meta *block;
 	struct block_meta *last = global_base;
-	//For test Purpose
 	
-	if((i++)==2)
-		return NULL;
+	
 	
 	if (!global_base) 
 	{ // First call.
@@ -291,9 +314,11 @@ void *myallocate(int size, int type) {
   }
   else
   {
+  	printf("Size requeted: %d\n",size );
   	block = myallocate_self(size);
   	if(block==NULL)
   	{	
+  		printf("Entered\n");
   		if(current_index_swap + size > 16777216)
   			return NULL;
   		else
@@ -335,12 +360,12 @@ alarm_count++;
 d =alarm_count%10;
 if(d<5)    
 {
-	printf("Time slice %d running for Q1\n", d);
+	//printf("Time slice %d running for Q1\n", d);
 	my_pthread_yield(0);
 }   
 else if(d%2==1)
 {		
-		printf("Time slice %d running for Q2\n", d/3);
+		//printf("Time slice %d running for Q2\n", d/3);
 		if(d==9)alarm_count=0;
 		my_pthread_yield(1);
 }
@@ -371,7 +396,7 @@ context of execution. */
 static void threadStart( void (*func)(void) )
 {
 	threadList[currentThread].active = 1;
-	printf("Thread %d is running with priority %d\n",currentThread,threadList[currentThread].priority );
+	//printf("Thread %d is running with priority %d\n",currentThread,threadList[currentThread].priority );
 	func();
 	threadList[currentThread].active = 0;
 	
@@ -394,7 +419,7 @@ void my_pthread_yield(int priority_thread)
 		/* Switch to the main context */
 		if(threadList[currentThread].priority ==1)
 		{	
-			printf( "Thread %d yielding the processor...\n", currentThread );
+			//printf( "Thread %d yielding the processor...\n", currentThread );
 			swapcontext( &threadList[currentThread].context, &mainContext );
 		}
 		if(threadList[currentThread].priority ==0)
@@ -402,7 +427,7 @@ void my_pthread_yield(int priority_thread)
 			threadList[currentThread].priority = 1;
 			num_low_priority_threads++;
 			num_high_priority_threads--;
-			printf( "Thread %d yielding the processor...\n", currentThread );
+			//printf( "Thread %d yielding the processor...\n", currentThread );
 			swapcontext( &threadList[currentThread].context, &mainContext );
 		}
 	}
@@ -443,6 +468,9 @@ void my_pthread_yield(int priority_thread)
 		swapcontext( &mainContext, &threadList[ currentThread ].context );
 		inThread = 0;
 		
+		if(threadList[currentThread].swapped == 1)
+			swapin();
+
 		if ( threadList[currentThread].active == 0 )
 		{
 			printf( "Thread %d is finished. Cleaning up.\n", currentThread );
@@ -458,7 +486,7 @@ void my_pthread_yield(int priority_thread)
     	              temp->free = 1;
                 temp = temp->next;
             }
- 			printf("Freed\n");
+ 			//printf("Freed\n");
 
 			/* Swap the last thread with the current, now empty, entry */
 			-- numThreads;
