@@ -74,7 +74,7 @@ struct block_meta {
 
 void *global_base = NULL;
 struct block_meta *temp;
-struct block_meta *tempSwap;
+void *tempSwap ;
 
 #define META_SIZE sizeof(struct block_meta)
 
@@ -83,6 +83,7 @@ void *getswapmemory(int size)
 	int i,j,position,m=0;
 	long int startadd[numThreads],endadd[numThreads],c=0;
 	long int temp;
+	tempSwap = swap_memory+((1024*1024*16) - 4096);
 	//printf("%p %lu\n",swap_memory, (long int)swap_memory );
 	for(i=0;i<numThreads;i++)
 	{ 
@@ -159,6 +160,7 @@ int swapout()
 	printf("\nThread %d swapped out\n", thread);
    return 1;
 }
+
 int threadToBeSwapped()
 {
 	struct block_meta *block = global_base;
@@ -174,17 +176,38 @@ int swapin()
 	printf("Swap In called\n");
 	int size;
 	int thread;
-	void *tempSwapaddress=tempSwap;
 
 	size = threadList[currentThread].end_address - threadList[currentThread].start_address;
-	memcpy (tempSwapaddress,threadList[currentThread].start_address,size); // block at C copied to tempSwap memory
-	thread = (*tempSwap).owner_thread; // get owner here
+	
+	printf("\ntempswap address:%p\n", &tempSwap);
+
+	memcpy (tempSwap,threadList[currentThread].start_address,size); // block at C copied to tempSwap memory
+	
+	thread = findowner();
+	if (thread == -1)
+	{
+		printf("\n Nothing to swap back in");
+		return -1;
+	}
+	
 	threadList[thread].swapped = 1;
 	memcpy (threadList[thread].start_address,threadList[currentThread].start_address_swap,size); // swapping back in
 	threadList[currentThread].swapped = 0;
-	memcpy (threadList[currentThread].start_address_swap,tempSwapaddress,size); //copying tempSwap to swap memory
+	memcpy (threadList[currentThread].start_address_swap,tempSwap,size); //copying tempSwap to swap memory
 
 	printf("\nThread %d swapped back in\n",currentThread);
+	return 1;
+}
+
+int findowner()
+{
+	int i=0;
+	for(i=0;i<numThreads;i++)
+	{
+		if(threadList[i].end_address == threadList[currentThread].end_address)
+			return i;
+	}
+	return -1;
 }
 
 void *sbrk1(int nbytes)
