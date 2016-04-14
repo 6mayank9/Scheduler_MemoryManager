@@ -42,7 +42,7 @@ void fibonacchi()
     {          
         mutex_lock(&mutex);
         *nextThread = *thread + *(thread+1);
-	    sleep(1);        
+	    //sleep(1);        
 	    printf( "fibonacchi(%d) = %d\n", *i, *nextThread );
         *thread = *(thread+1);
         *(thread+1) = *nextThread;    

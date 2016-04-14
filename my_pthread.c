@@ -83,7 +83,6 @@ void *getswapmemory(int size)
 	int i,j,position,m=0;
 	long int startadd[numThreads],endadd[numThreads],c=0;
 	long int temp;
-	tempSwap = swap_memory+((1024*1024*16) - 4096);
 	//printf("%p %lu\n",swap_memory, (long int)swap_memory );
 	for(i=0;i<numThreads;i++)
 	{ 
@@ -176,10 +175,10 @@ int swapin()
 	printf("Swap In called\n");
 	int size;
 	int thread;
-
+    tempSwap = swap_memory+((1024*1024*16) - 4096);
 	size = threadList[currentThread].end_address - threadList[currentThread].start_address;
 	
-	printf("\ntempswap address:%p\n", &tempSwap);
+	//printf("\ntempswap address:%p\n", &tempSwap);
 
 	memcpy (tempSwap,threadList[currentThread].start_address,size); // block at C copied to tempSwap memory
 	
@@ -342,7 +341,7 @@ void *myallocate(int size,char FILE[],int LINE, int type) {
   	if(block==NULL)
   	{	
   		printf("Entered\n");
-  		if(current_index_swap + size > 16777216)
+  		if(current_index_swap + size > ((1024*1024*16)-4096))
   			return NULL;
   		else
   		{
