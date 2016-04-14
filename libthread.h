@@ -42,8 +42,8 @@ extern int my_pthread_create( void (*func)(void) );
 extern void my_pthread_yield(int priority);
 
 extern int get_numThreads();
-extern void *myallocate(int size, int type);
-extern void mydeallocate(void *ptr, int type);
+extern void *myallocate(int size,char FILE[],int LINE, int type);
+extern void mydeallocate(void *ptr, char FILE[],int LINE,int type);
 
 /* Execute the threads until they all quit. */
 extern int waitForAllThreads();

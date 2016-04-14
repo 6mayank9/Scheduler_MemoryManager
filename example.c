@@ -5,14 +5,14 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <stddef.h>
-//#define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
-//#define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
+#define malloc(x) myallocate(x, __FILE__, __LINE__, THREADREQ)
+#define free(x) mydeallocate(x, __FILE__, __LINE__, THREADREQ)
 #define THREADREQ 1
 //#include "queue.h"
 int mutex;
 void my_thread1()
 {
-    int *i = myallocate(sizeof(int),THREADREQ);
+    int *i = (int*)malloc(sizeof(int));
     if(i==NULL)
 	{  printf("\nOverflow");
 	exit(0);
@@ -21,7 +21,7 @@ void my_thread1()
     {
                 mutex_lock(&mutex);
         printf( "Hey, I'm my_thread #1: %d\n", *i );
-       //sleep(1);                
+        sleep(1);                
         mutex_unlock(&mutex);
       // run 3 threads for 50ms eac
     }
@@ -30,20 +30,20 @@ void my_thread1()
 
 void fibonacchi()
 {
-    int *i = (int*)myallocate(sizeof(int),THREADREQ);
+    int *i = (int*)malloc(sizeof(int));
     
-    int *thread= (int*)myallocate(2*sizeof(int),THREADREQ);
+    int *thread= (int*)malloc(2*sizeof(int));
     *thread =0;
     *(thread+1) = 1;
     /*sleep( 2 ); */
     printf( "fibonacchi(0) = 0\nfibonnachi(1) = 1\n" );
-    int *nextThread = (int*)myallocate(sizeof(int),THREADREQ);
+    int *nextThread = (int*)malloc(sizeof(int));
     for( *i = 2; *i < 15; ++ *i )
     {          
         mutex_lock(&mutex);
         *nextThread = *thread + *(thread+1);
-	//sleep(1);        
-	printf( "fibonacchi(%d) = %d\n", *i, *nextThread );
+	    sleep(1);        
+	    printf( "fibonacchi(%d) = %d\n", *i, *nextThread );
         *thread = *(thread+1);
         *(thread+1) = *nextThread;    
         mutex_unlock(&mutex);
@@ -55,13 +55,13 @@ void fibonacchi()
 
 void squares()
 {
-    int *i = myallocate(sizeof(int),THREADREQ);
+    int *i = (int*)malloc(sizeof(int));
     
     /*sleep( 5 ); */
     for ( *i = 0; *i < 10; ++ *i )
     {       mutex_lock(&mutex);
         printf( "%d*%d = %d\n", *i, *i, (*i)*(*i) );
-	//sleep(1);                
+	sleep(1);                
 	mutex_unlock(&mutex);
       
 

@@ -27,7 +27,7 @@ typedef int THREADREQ;
 #endif
 
 /* The maximum number of threads that can be active at once. */
-#define MAX_THREADS 10
+#define MAX_THREADS 10000
 /* The size of the stack for each thread. */
 #define FIBER_STACK (1024*1024)
 
@@ -42,7 +42,7 @@ extern int my_pthread_create( void (*func)(void) );
 extern void my_pthread_yield(int priority);
 
 extern int get_numThreads();
-extern void *myallocate(int size, int type);
+extern void *myallocate(size_t size,char FILE[],int LINE int type);
 extern void mydeallocate(void *ptr, int type);
 
 /* Execute the threads until they all quit. */

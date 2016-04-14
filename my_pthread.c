@@ -323,7 +323,7 @@ void *myallocate_self(int size)
   }
   return block;
 }
-void *myallocate(int size, int type) {
+void *myallocate(int size,char FILE[],int LINE, int type) {
   
   struct block_meta *block;
   int i;
@@ -348,7 +348,7 @@ void *myallocate(int size, int type) {
   		{
 	  		if(swapout())
 	  		{
-	  			block = myallocate(size, type);
+	  			block = myallocate(size,__FILE__,__LINE__, type);
 	  			block->owner_thread = numThreads;
 	  			return block;
 	  		}
@@ -361,7 +361,7 @@ void *myallocate(int size, int type) {
   return(block + 1);
 }
 
-void mydeallocate(void *ptr, int type) {
+void mydeallocate(void *ptr, char FILE[],int LINE,int type) {
   if (!ptr) {
     return;
   }
@@ -546,7 +546,7 @@ int my_pthread_create( void (*func)(void) )
 	threadList[numThreads].context.uc_stack.ss_sp = threadList[numThreads].stack;
 	threadList[numThreads].context.uc_stack.ss_size = FIBER_STACK;
 	threadList[numThreads].context.uc_stack.ss_flags = 0;
-	threadList[numThreads].start_address = (void*)myallocate(4095,0);
+	threadList[numThreads].start_address = (void*)myallocate(4095,__FILE__,__LINE__,0);
 	threadList[numThreads].end_address = threadList[numThreads].start_address + 4095;
 	threadList[numThreads].current_index = 0;
 	
